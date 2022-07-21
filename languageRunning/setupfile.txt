@@ -14,10 +14,6 @@ for (let i = 0; process.argv.length; i++) {
     if (argv[i] === "--input") inputFilesDir = argv[i + 1];
     if (argv[i] === "--output") outputFileDir = argv[i + 1];
     if (argv[i] === "--setup") {
-        if(argv[i + 1] != "--y") {
-           console.log("If you have any thing that you had imported, it will be removed from the package.json for the setup! To confirm run the command again with --y after --setup");
-           process.exit(1);
-        }
         setup();
         process.exit(1);
     }
