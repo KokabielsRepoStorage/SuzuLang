@@ -1,6 +1,6 @@
 # languageTesting
 
-Its a custom programming language that convers .suzu files into .mjs files
+Its a custom programming language that converts .suzu files into .mjs files
 
 
 Custom features :
