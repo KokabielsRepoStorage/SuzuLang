@@ -1,2 +1,0 @@
-createBot("puppynuff@gmail.com", "", "microsoft", "mc.hypixel.net", "1.16.4", false);
-createClient("");

@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import { exec } from "child_process";
 import { Client, GatewayIntentBits } from "discord.js";
+import path from "path";
 
 //Main code
 const strings = {};
@@ -12,10 +13,18 @@ const ints = {};
 const arrays = {};
 const dictionaries = {};
 const varType = ["int", "string", "array"];
+var labelUsed
 
 export function parse(inputFile, outputFile) {
+    console.log(inputFile, outputFile);
 
     if (!inputFile || !outputFile) throw new Error("No input or output file specified");
+
+    var dirPath = path.dirname(outputFile);
+
+    if(!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
 
     var code;
     try {
@@ -41,6 +50,10 @@ export function parse(inputFile, outputFile) {
 
     compiledCode += "'use strict';\n";
 
+    while(code.includes(".suzu")) {
+        code = code.replace(".suzu", ".mjs");
+    }
+
     for (var i = 0; i < lines.length; i++) {
 
         lines[i] = lines[i].split("//")[0];
@@ -50,7 +63,7 @@ export function parse(inputFile, outputFile) {
         else if (lines[i].includes("dict")) compiledCode = parseDict(lines, compiledCode, i);
         else if (lines[i].includes("createClient")) compiledCode = createClient(lines[i], compiledCode);
         else if(lines[i].includes("createBot")) compiledCode = createBot(lines[i], compiledCode);
-        else if(lines[i].includes("window()")) compiledCode = window(lines[i], compiledCode);
+        else if(lines[i].includes("window")) compiledCode = window(lines[i], compiledCode);
         else if(lines[i].includes("label(")) {
             compiledCode = label(lines[i], compiledCode);
         }
@@ -278,31 +291,63 @@ bot.on("message", async (message) => {
 function window(line, compiledCode) {
     compiledCode = "import { QMainWindow } from '@nodegui/nodegui'\n" + compiledCode;
 
-    compiledCode += `const win = new QMainWindow();
-    win.show();
+    const part = line.substring(line.indexOf("(") + 1, line.indexOf(")"));
+    const args = part.split(',');
+
+    const width = args[0];
+    const height = args[1];
+
+    if(!width || !height) throw new Error("Width and height are required");
+
+    compiledCode += `const win = new QMainWindow({ width : ${width}, height : ${height} });
+win.show();
     \n`;
 
     return compiledCode;
 }
 
 function label(line, compiledCode) {
-    compiledCode = "import { QLabel } from '@nodegui/nodegui'\n" + compiledCode;
+
+    if(labelUsed == true) {
+        compiledCode = "import { QLabel } from '@nodegui/nodegui'\n" + compiledCode;
 
 
-    var part = line.substring(line.indexOf("(") + 1, line.indexOf(")"));
+        var part = line.substring(line.indexOf("(") + 1, line.indexOf(")"));
+    
+        var args = part.split(",");
+    
+        compiledCode += `const label = new QLabel(win);\n`;
+        compiledCode += `label.setText(${args[0]});\n`;
+    
+        if(args[1]) {
+            compiledCode += `label.setInlineStyle("${args[1]}");\n`;
+        } 
+    
+        compiledCode = compiledCode.replace("win.show();", "");
+        compiledCode += `win.show();\n`;
+        compiledCode += `global.win = win;\n`;
+    
+        labelUsed = true;
+    
+        return compiledCode;    
+    }
 
-    var args = part.split(",");
+    else {
+        var part = line.substring(line.indexOf("(") + 1, line.indexOf(")"));
+        var args = part.split(",");
+        var i;
 
-    compiledCode += `const label = new QLabel(win);\n`;
-    compiledCode += `label.setText("${args[0]}");\n`;
+        compiledCode += `const ${args[3]} = new QLabel(win);\n`;
+        compiledCode += `${args[3]}.setText(${args[0]});\n`;
 
-    if(args[1]) {
-        compiledCode += `label.setInlineStyle("${args[1]}");\n`;
-    } 
+        if(args[1]) {
+            compiledCode += `${args[3]}.setInlineStyle("${args[1]}");\n`;
+        } 
 
-    compiledCode = compiledCode.replace("win.show()");
-    compiledCode += `win.show();\n`;
-    compiledCode += `global.win = win;\n`;
+        compiledCode = compiledCode.replace("win.show();", "");
+        compiledCode += `win.show();\n`;
+        compiledCode += `global.win = win;\n`;
+        return compiledCode;
+    }
 
-    return compiledCode;
 }
