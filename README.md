@@ -12,3 +12,6 @@ Require variable initialization
 Require variable type
 createClient makes a discord client
 creatBot makes a discord bot
+
+
+To setup run npm run setup and then run npm i
