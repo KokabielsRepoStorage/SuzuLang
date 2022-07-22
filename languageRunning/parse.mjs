@@ -13,16 +13,14 @@ const ints = {};
 const arrays = {};
 const dictionaries = {};
 const varType = ["int", "string", "array"];
-var labelUsed
+var parenthisis = 0;
+var labelUsed = false;
 
-export function parse(inputFile, outputFile) {
-    console.log(inputFile, outputFile);
-
+export function parse(inputFile, outputFile, strict) {
     if (!inputFile || !outputFile) throw new Error("No input or output file specified");
-
     var dirPath = path.dirname(outputFile);
 
-    if(!fs.existsSync(dirPath)) {
+    if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
     }
 
@@ -48,24 +46,34 @@ export function parse(inputFile, outputFile) {
         return exec(`node ${outputFile}`);
     }
 
-    compiledCode += "'use strict';\n";
-
-    while(code.includes(".suzu")) {
+    if (strict == true) {
+        compiledCode += "'use strict';\n";
+    }
+    while (code.includes(".suzu")) {
         code = code.replace(".suzu", ".mjs");
     }
 
     for (var i = 0; i < lines.length; i++) {
 
         lines[i] = lines[i].split("//")[0];
+
+        if (lines[i] == "") continue;
         if (lines[i].includes("string")) compiledCode = parseString(lines[i], compiledCode);
         else if (lines[i].includes("int")) compiledCode = parseInt(lines[i], compiledCode);
         else if (lines[i].includes("Array")) compiledCode = parseArray(lines[i], compiledCode);
         else if (lines[i].includes("dict")) compiledCode = parseDict(lines, compiledCode, i);
-        else if (lines[i].includes("createClient")) compiledCode = createClient(lines[i], compiledCode);
-        else if(lines[i].includes("createBot")) compiledCode = createBot(lines[i], compiledCode);
-        else if(lines[i].includes("window")) compiledCode = window(lines[i], compiledCode);
-        else if(lines[i].includes("label(")) {
-            compiledCode = label(lines[i], compiledCode);
+        else if (lines[i].includes("createClient(")) compiledCode = createClient(lines[i], compiledCode);
+        else if (lines[i].includes("createBot(")) compiledCode = createBot(lines[i], compiledCode);
+        else if (lines[i].includes("window(")) compiledCode = window(lines[i], compiledCode);
+        else if (lines[i].includes("label(")) compiledCode = label(lines[i], compiledCode);
+        else if (lines[i].includes("button(")) compiledCode = button(lines[i], compiledCode);
+        else if (lines[i].includes("scrollArea(")) compiledCode = scrollArea(lines[i], compiledCode);
+        else if (lines[i].includes("buttonClicked(")) {
+            compiledCode = buttonClick(lines, compiledCode, i);
+            while (!lines[i].includes("}")) {
+                i++;
+            }
+            i++;
         }
         else compiledCode += lines[i] + "\n";
     }
@@ -238,9 +246,9 @@ function createClient(line, compiledCode, code) {
 
     compiledCode = "import { Client, GatewayIntentBits } from 'discord.js';\n" + compiledCode;
 
-    compiledCode += `\n\nconst client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildBans, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageTyping, GatewayIntentBits.DirectMessages, GatewayIntentBits.DirectMessageTyping, GatewayIntentBits.DirectMessageReactions, GatewayIntentBits.GuildVoiceStates] });\n\n`;
+    compiledCode += `const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildBans, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageTyping, GatewayIntentBits.DirectMessages, GatewayIntentBits.DirectMessageTyping, GatewayIntentBits.DirectMessageReactions, GatewayIntentBits.GuildVoiceStates] });\n`;
 
-    compiledCode += 'client.on(`ready`, () => {\nconsole.log(`Logged in as ${client.user.tag}`)});\n';
+    compiledCode += 'client.on(`ready`, () => {console.log(`Logged in as ${client.user.tag}`)});\n';
 
     compiledCode += `client.login(${token});\n`;
 
@@ -259,9 +267,9 @@ function createBot(line, compiledCode) {
     var version = args[4];
     var SbDoggosBot = args[5];
 
-    if(!username && !auth && !host && !version && !SbDoggosBot) throw new Error("Username, auth, host, and version are required");
+    if (!username && !auth && !host && !version && !SbDoggosBot) throw new Error("Username, auth, host, and version are required");
 
-    if(!SbDoggosBot) {
+    if (!SbDoggosBot) {
         compiledCode = "import mineflayer from 'mineflayer';" + compiledCode;
 
         compiledCode += `var options = {
@@ -270,7 +278,7 @@ function createBot(line, compiledCode) {
     username : ${username},
     password : ${password},
     auth : ${auth},
-}\n\nconst bot = mineflayer.createBot(options);\n\nbot.on('login', async () => 
+}\nconst bot = mineflayer.createBot(options);\nbot.on('login', async () => 
     console.log("Logged in as " + bot.username);
 });\n`;
     } else {
@@ -279,10 +287,9 @@ function createBot(line, compiledCode) {
         compiledCode += `const bot = login("SBDoggosBot");\nbot.on('login', () => {
     console.log("Logged in as " + bot.username);
 })
-
 bot.on("message", async (message) => {
     handleMessages(message);
-});\n\n`
+});\n`
     }
 
     return compiledCode;
@@ -297,39 +304,40 @@ function window(line, compiledCode) {
     const width = args[0];
     const height = args[1];
 
-    if(!width || !height) throw new Error("Width and height are required");
+    if (!width || !height) throw new Error("Width and height are required");
 
-    compiledCode += `const win = new QMainWindow({ width : ${width}, height : ${height} });
+    if (args[2] && args[2].replace(" ", "") == "fixed") {
+        compiledCode += `const win = new QMainWindow();
 win.show();
-    \n`;
-
+win.setFixedSize(${width}, ${height});\n`;
+    } else {
+        compiledCode += `const win = new QMainWindow();
+win.show();
+win.setBaseSize(${width}, ${height});\n`;
+    }
     return compiledCode;
 }
 
 function label(line, compiledCode) {
 
-    if(labelUsed == true) {
+    if (labelUsed == false) {
         compiledCode = "import { QLabel } from '@nodegui/nodegui'\n" + compiledCode;
 
 
         var part = line.substring(line.indexOf("(") + 1, line.indexOf(")"));
-    
+
         var args = part.split(",");
-    
+
         compiledCode += `const label = new QLabel(win);\n`;
         compiledCode += `label.setText(${args[0]});\n`;
-    
-        if(args[1]) {
-            compiledCode += `label.setInlineStyle("${args[1]}");\n`;
-        } 
-    
+
         compiledCode = compiledCode.replace("win.show();", "");
         compiledCode += `win.show();\n`;
         compiledCode += `global.win = win;\n`;
-    
+
         labelUsed = true;
-    
-        return compiledCode;    
+
+        return compiledCode;
     }
 
     else {
@@ -337,12 +345,8 @@ function label(line, compiledCode) {
         var args = part.split(",");
         var i;
 
-        compiledCode += `const ${args[3]} = new QLabel(win);\n`;
-        compiledCode += `${args[3]}.setText(${args[0]});\n`;
-
-        if(args[1]) {
-            compiledCode += `${args[3]}.setInlineStyle("${args[1]}");\n`;
-        } 
+        compiledCode += `const ${args[1]} = new QLabel(win);\n`;
+        compiledCode += `${args[1]}.setText(${args[0]});\n`;
 
         compiledCode = compiledCode.replace("win.show();", "");
         compiledCode += `win.show();\n`;
@@ -350,4 +354,52 @@ function label(line, compiledCode) {
         return compiledCode;
     }
 
+}
+
+function button(line = "", compiledCode) {
+    const part = line.substring(line.indexOf("(") + 1, line.lastIndexOf(")"));
+    const args = part.split(",");
+    compiledCode = "import { QPushButton } from '@nodegui/nodegui'\n" + compiledCode;
+    compiledCode += `const ${args[1]} = new QPushButton(win);\n`;
+    compiledCode += `${args[1]}.setText(${args[0]});\n`;
+    compiledCode = compiledCode.replace("win.show();", "");
+    compiledCode += `win.setCentralWidget(${args[1]});\n`;
+    compiledCode += `win.show();\n`;
+    return compiledCode;
+}
+
+function scrollArea(line, compiledCode) {
+    compiledCode = "import { QScrollArea } from '@nodegui/nodegui'\n" + compiledCode;
+
+    const part = line.substring(line.indexOf("(") + 1, line.indexOf(")"));
+    const args = part.split(",");
+
+    compiledCode += `const ${args[0]} = new QScrollArea(win);\n`;
+
+    compiledCode += `${args[0]}.setWidget(${args[1]});\n`;
+
+    compiledCode += `win.setCentralWidget(${args[0]});\n`;
+
+    compiledCode = compiledCode.replace("win.show();", "");
+
+    compiledCode += `win.show();\n`;
+
+    return compiledCode;
+}
+
+function buttonClick(lines, compiledCode, i) {
+    const part = lines[i].substring(lines[i].indexOf("(") + 1, lines[i].indexOf(")"));
+    const args = part.split(",");
+    compiledCode += `${args[0]}.addEventListener('clicked', () => {\n`;
+    i++;
+    parenthisis = 1;
+    while (lines[i] != '}' && parenthisis != 0) {
+        if (lines[i].includes("{")) parenthisis++;
+        if (lines[i].includes("}")) parenthisis--;
+
+        if ((parenthisis != 0 && !lines[i].includes('}')) || parenthisis >= 1) compiledCode += lines[i] + "\n";
+        i = i + 1;
+    }
+    compiledCode += `});\n`;
+    return compiledCode;
 }

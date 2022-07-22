@@ -4,6 +4,9 @@ import fs from "fs";
 import path from "node:path";
 import glob from "glob";
 import { sleep } from "suzufunctions";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const config = require("../suzuconfig.json");
 
 var inputFilesDir = "";
 var outputFileDir = "";
@@ -28,35 +31,32 @@ for (let i = 0; process.argv.length; i++) {
 
 console.log("Starting interpretor..., this might take a while...");
 
-if (!inputFilesDir || !outputFileDir) {
+if(!inputFilesDir) inputFilesDir = config.inputDir;
+if(!outputFileDir) outputFileDir = config.outputDir;
+
+if ((!inputFilesDir || !outputFileDir)) {
     console.log("No input or output file specified (Specify them by --input (folderPath) and --output (folderPath)");
     process.exit(1);
 }
 
-// fs.readdirSync(inputFilesDir).forEach(file => {
-//     inputFiles.push(file);
-// });
-
-// options is optional
 await glob(inputFilesDir + "**/*.suzu", function (er, files) {
-    console.log(files);
     inputFiles = files;
-    console.log(inputFiles);
 });
 
 while (inputFiles.length === 0) {
     await sleep(100);
 }
-console.log(inputFiles);
-
 for (let i = 0; i < inputFiles.length; i++) {
 
     var filePath = path.dirname(inputFiles[i]) + "/" + path.basename(inputFiles[i]).replace(".suzu", "") + `.mjs`;
 
     filePath = filePath.replace(`${inputFilesDir}`, `${outputFileDir}`);
 
-    parse(`${inputFiles[i]}`, filePath);
+    parse(`${inputFiles[i]}`, filePath, config.usestrict);
 }
+
+console.log("Finished!");
+process.exit(1);
 
 
 function setup() {
