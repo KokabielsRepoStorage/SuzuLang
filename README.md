@@ -14,4 +14,7 @@ createClient makes a discord client
 creatBot makes a discord bot
 
 
-To setup run npm run setup and then run npm i
+To setup run npm run setup and then run npm I
+
+I am going to take this into a separate direction
+Good side is that it will be updated again, and I will try making it a fully fledged language
