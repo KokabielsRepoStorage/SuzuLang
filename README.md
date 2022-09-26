@@ -1,5 +1,8 @@
 # languageTesting
 
+# This is outdated. Go to [The current version](https://github.com/Suzzudev/SuzuScript)
+## This repo is going to be archived
+
 Its a custom programming language that converts .suzu files into .mjs files
 
 
